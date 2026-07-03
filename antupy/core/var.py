@@ -96,7 +96,7 @@ def CF(unit1: str|Unit, unit2: str|Unit) -> Var:
         u2 = unit2
     else:
         u2 = Unit(unit2)
-    if u1.base_units == u2.base_units:
+    if u1.base_exps == u2.base_exps:
         return Var(
             u1.base_factor / u2.base_factor,
             _div_units(u2.label_unit, u1.label_unit)
@@ -193,7 +193,7 @@ class Var():
             return Var(None, self.unit)
         if self.unit == other.unit:
             return Var(self.value + other.value, self.unit)
-        elif self.unit.base_units == other.unit.base_units:
+        elif self.unit.base_exps == other.unit.base_exps:
             return Var(self.value + other.gv(self.unit.label_unit), self.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
@@ -206,7 +206,7 @@ class Var():
             return Var(None, self.unit)
         if self.unit == other.unit:
             return Var(self.value - other.value, self.unit)
-        elif self.unit.base_units == other.unit.base_units:
+        elif self.unit.base_exps == other.unit.base_exps:
             return Var(self.value - other.gv(self.unit.u), self.unit)
         else:
             raise TypeError(f"Cannot subtract {self.unit} with {other.unit}. Units are not compatible.")
@@ -219,7 +219,7 @@ class Var():
             return Var(None, self.unit)
         if self.unit == other.unit:
             return Var(self.value + other.value, other.unit)
-        elif self.unit.base_units == other.unit.base_units:
+        elif self.unit.base_exps == other.unit.base_exps:
             return Var(other.value + self.gv(other.unit.u), other.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
@@ -285,7 +285,7 @@ class Var():
             return False
         return (
             self.value == other.value * CF(other.unit.u, self.unit.u).v
-            and self.unit.base_units == other.unit.base_units
+            and self.unit.base_exps == other.unit.base_exps
         )
 
     def __lt__(self, other) -> bool:
@@ -395,7 +395,7 @@ class Var():
             raise ValueError("Var value is None.")
         if self.unit == unit:
             return self.value
-        if self.unit.base_units == Unit(unit).base_units:
+        if self.unit.base_exps == Unit(unit).base_exps:
             if unit in ["°C", "degC","K"]:
                 return float(_conv_temp(self, unit))
             return self.value * CF(self.unit.u, unit).v
@@ -405,7 +405,7 @@ class Var():
     def set_unit(self, unit: str | None = None) -> Var:
         """ Set the primary unit of the variable. """
         unit = str(unit)
-        if (self.unit.base_units == Unit(unit).base_units) and (self.value is not None):
+        if (self.unit.base_exps == Unit(unit).base_exps) and (self.value is not None):
             return Var(self.value * CF(self.unit, unit).v, Unit(unit))
         else:
             raise ValueError(
