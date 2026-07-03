@@ -4,16 +4,30 @@
  - **Utilities layer**: A set of helper modules: `props` (thermophysical properties), `htc` (heat transfer correlations), `solar` (sun position and radiation calculations), and `loc` (geographical location management).
  - **Simulation layer**: Framework for building and analyzing energy systems using `Model`, `Plant`, and `Parametric` classes, and a set of time-series generators to retrieve useful data (e.g. `Weather`, `Market`).
 
+## Brief Introduction
+`antupy` works in its core with a unit management system represented by the class `Unit`, that represents physical quantities compatible with the SI unit system. From this, three type of variables are introduced:
+ 1. The `Var` class to manage single variables, with the structure `(value:float, unit:str)`.
+ 2. The `Array` class for 1D data structures in the form of `(array:np.ndarray, unit:str)`.
+ 3. The `Frame` class for 2D data structures in the form of `(frame:DataFrame, units:list[str])`.
+Where the string `unit` (or `units`) has to follow a couple of [simple rules](https://antupy.readthedocs.io/en/latest/units.html#valid-unit-strings) to represent properly physical units. All three classes support arithmetic operations with automatic unit conversion and dimensional checking, ensuring dimensional consistency throughout calculations.
+
+You can start using `antupy` with these three classes to support your calculations. The utility modules and simulation classes provide additional functionality. Check the examples below and the documentation for further information.
 
 ## Documentation
 The full documentation is available [here](https://antupy.readthedocs.io/).
 
-## Brief Introduction
-`antupy` works in its core with a unit management module `units`, which include the class `Unit` to represent units that are compatible with the SI unit system. From this, three type of variables are introduced:
- 1. The `Var` class to manage single variables, with the structure `(value:float, unit:str)`.
- 2. The `Array` class for 1D data structures in the form of `(array:np.ndarray, unit:str)`.
- 3. The `Frame` class for 2D data structures in the form of `(frame:pd.DataFrame, units:list[str])`.
-Where the string `unit` (or `units`) has to follow a couple of [simple rules](https://antupy.readthedocs.io/en/latest/units.html#valid-unit-strings) to represent properly physical units. All three classes support arithmetic operations with automatic unit conversion and dimensional checking, ensuring dimensional consistency throughout calculations.
+## Installation
+The easiest way to install `antupy` is using pip:
+
+```bash
+py -m pip install antupy
+```
+
+As usual, it is recommended to use a virtual environment to avoid conflicts with other packages. `antupy` core system depends only on numpy and polars (which is just an alternative of pandas), while other modules have additional dependencies, such as `CoolProp` in `ap.props` and `pvlib` in `ap.solar`.
+
+Conda is still not implemented as a distribution method, but it is planned for the future. If you need it, please contact the author or raise an issue.
+
+This is an open-source initiative. You can download the source code and use it freely. Look at the toml file. If you want to contribute, please contact the author or raise an issue.
 
 ## Examples
 
@@ -98,6 +112,8 @@ print(f"Energy stored: {q_stg.su('kWh'):.1f}")  # Output in kWh
 ```
 
 This is the basic usage. For deeper usage and the use of the simulation classes such as `Plant` and `Parametric`, see the `documentation`.
+
+## Applications
 
 So far, some research projects that have used antupy:
 - [bdr_csp](https://github.com/DavidSaldivia/bdr_csp): A repository for csp simulations.
