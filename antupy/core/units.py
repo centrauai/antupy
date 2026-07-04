@@ -239,7 +239,7 @@ class Unit():
         """
         top_str = ""
         bottom_str = ""
-        d = [(k,int(v)) for (k,v) in self.base_units.items()]    #type: ignore
+        d = [(k,int(v)) for (k,v) in self.base_exps.items()]
         for (comp,exp) in d:
             if exp>0:
                 expr = f"{comp}{abs(exp)}" if exp>1 else f"{comp}"
