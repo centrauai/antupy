@@ -42,16 +42,19 @@ DERIVED_UNITS: dict[str, tuple[float,str,str,str]] = {
 }
 
 RELATED_UNITS: dict[str, tuple[float,str,str,str]] = {
+    # "": (1e0, "-", "adimensional", "adim"),
+    "adim": (1e0, "-", "adimensional", "adim"),
+    "1": (1e0, "-", "adimensional", "adim"),
     "L": (1e-3, "m3", "liter", "volume"),
     "l": (1e-3, "m3", "liter", "volume"),
     "sec": (1e0, "s", "second", "time"),
     "min": (60., "s", "minute", "time"),
     "hr": (3600., "s", "hour", "time"),
     "day": (86400., "s", "day", "time"),
-    "wk": (24*3600*7, "s", "year", "time"),
-    "week": (24*3600*7, "s", "year", "time"),
-    "mo": (24*3600*30, "s", "year", "time"),
-    "month": (24*3600*30, "s", "year", "time"),
+    "wk": (24*3600*7, "s", "week", "time"),
+    "week": (24*3600*7, "s", "week", "time"),
+    "mo": (24*3600*30, "s", "month", "time"),
+    "month": (24*3600*30, "s", "month", "time"),
     "yr": (31536000, "s", "year", "time"),
     "year": (31536000, "s", "year", "time"),
     "au": (149597870700, "m", "astronomic_unit", "length"),
@@ -203,86 +206,72 @@ class Unit():
     Array : Array class that uses Unit for dimensional consistency
     """
 
-    def __init__(self, unit: str = "-", base_factor: float = 1e0):
+    def __init__(
+            self,
+            unit: str|Unit|None = "-",
+            base_factor: float = 1e0
+        ):
         self.base_exps: UnitDict = BASE_ADIM.copy()
         self.base_factor: float = base_factor
-        self.label_unit: str = unit
+        self._label_unit_cache: str|None = None
+        self._tol: float = 1e-7
+
+        if isinstance(unit, Unit):
+            self._set_labels(unit._label_top, unit._label_bottom)
+        elif isinstance(unit, str):
+            self._set_labels([unit,], [])
+        elif unit is None:
+            self._set_labels(["-"], [])
+
         self._translate_to_base()
 
-    def __repr__(self) -> str:
-        return f"[{self.label_unit}]"
-    
-    def __eq__(self, other) -> bool:
-        if isinstance(other, Unit):
-            return (
-                (self.base_factor==other.base_factor)
-                and (self.base_exps == other.base_exps)
-            )
-        return False
+    def _set_labels(self, top: list[str], bottom: list[str]) -> None:
+        self._label_top = top
+        self._label_bottom = bottom
+        self._label_unit_cache = None
 
-    def __mul__(self, other: Unit) -> Unit:
-        if not isinstance(other, Unit):
-            raise TypeError("Can only multiply Unit by Unit")
-        base_factor = self.base_factor * other.base_factor
-        base_exps = {k: self.base_exps[k] + other.base_exps[k] for k in self.base_exps}
-        base_exps = UnitDict(**base_exps)
-        unit_result = Unit("-", base_factor)
-        unit_result.base_exps = base_exps
-        unit_result.label_unit = _mul_units(self.label_unit, other.label_unit)
-        return unit_result
-    
-    @property
-    def si(self) -> str:
+    def _translate_to_base(self) -> None:
+        factor_, unit_pool_ = self._split_unit(self.label_unit)
+        factor_ = self.base_factor * factor_
+        while len(unit_pool_)>0:
+            (name, exponent) = unit_pool_.pop(0)
+            if name in BASE_UNITS:
+                self._update_base_repr(name, exponent)
+            if name in DERIVED_UNITS|RELATED_UNITS:
+                new_label = (DERIVED_UNITS|RELATED_UNITS)[name][1]
+                new_factor1 = (DERIVED_UNITS|RELATED_UNITS)[name][0]
+                new_factor2, new_pool = self._split_unit(new_label)
+                for comp in new_pool:
+                    unit_pool_.append((comp[0], exponent*comp[1]))
+                factor_ *= (new_factor2*new_factor1)**np.sign(exponent)
+            self.base_factor = factor_
+        return None
+
+    @classmethod
+    def _split_unit(cls, unit: str) -> tuple[float, UnitPool]:
         """
-        Returns the unit in base SI representation.
-        The base SI representation is a string with the base factor and the base units in integer exponents
+        Split a unit label into its components, their factors and exponents.
+        For example, "kg-m/s2" becomes [("kg", 1), ("m", 1), ("s", -2)].
         """
-        top_str = ""
-        bottom_str = ""
-        d = [(k,int(v)) for (k,v) in self.base_exps.items()]
-        for (comp,exp) in d:
-            if exp>0:
-                expr = f"{comp}{abs(exp)}" if exp>1 else f"{comp}"
-                if top_str == "":
-                    top_str = expr
-                else:
-                    top_str = top_str + f"-{expr}"
-            elif exp<0:
-                expr = f"{comp}{abs(exp)}" if exp<-1 else f"{comp}"
-                if bottom_str == "":
-                    bottom_str = expr
-                else:
-                    bottom_str = bottom_str + f"-{expr}"
-            else:
-                continue
-        if bottom_str == "":
-            return f"{self.base_factor:.2e}[{top_str}]" if top_str != "" else "-"
+        unit_pool: UnitPool = []
+        if unit in ["-", "", "adim"]:
+            return 1.0, [("-", 0)]
+        if "/" in unit:
+            top, bottom = unit.split("/", 1)
+            top_units = top.split("-") if "-" in top else [top,]
+            bottom_units = bottom.split("-") if "-" in bottom else [bottom,]
         else:
-            return f"{self.base_factor:.2e}[{top_str if top_str != "" else "1"}/{bottom_str}]"
-
-    @property
-    def u(self)->str:
-        """
-        Returns the unit label.
-        This is just a shorter alias for label_unit."""
-        return self.label_unit
-
-    def compatible(self) -> list[str]:
-        return (
-            [
-                label for label in (BASE_UNITS | DERIVED_UNITS | RELATED_UNITS)
-                if self.base_exps == Unit(label).base_exps
-            ] + [
-                u for u in COMMON_QUANTITIES.values()
-                if self.base_exps == Unit(u).base_exps
-            ]
-        )
+            top_units = unit.split("-") if "-" in unit else [unit,]
+            bottom_units = []
+        unit_pool, factor_top = cls._parse_unit_comps(unit_pool, top_units, 1)
+        unit_pool, factor_bot = cls._parse_unit_comps(unit_pool, bottom_units, -1)
+        return (factor_top/factor_bot, unit_pool)
     
     def _update_base_repr(self, name: str, exponent: int):
         exponent_prev = self.base_exps.get(name,0)
         self.base_exps[name] = exponent+exponent_prev
         return
-
+    
     @staticmethod
     def _parse_unit_comps(
         unit_pool: UnitPool,
@@ -313,43 +302,103 @@ class Unit():
             unit_pool.append((name, exponent))
             factor_ *= factor
         return unit_pool, factor_
-                                                                   
-    @classmethod
-    def _split_unit(cls, unit: str) -> tuple[float, UnitPool]:
-        """
-        Split a unit label into its components, their factors and exponents.
-        For example, "kg-m/s2" becomes [("kg", 1), ("m", 1), ("s", -2)].
-        """
-        unit_pool: UnitPool = []
-        if unit in ["-", "", "adim"]:
-            return 1.0, [("-", 0)]
-        if "/" in unit:
-            top, bottom = unit.split("/", 1)
-            top_units = top.split("-") if "-" in top else [top,]
-            bottom_units = bottom.split("-") if "-" in bottom else [bottom,]
-        else:
-            top_units = unit.split("-") if "-" in unit else [unit,]
-            bottom_units = []
-        unit_pool, factor_top = cls._parse_unit_comps(unit_pool, top_units, 1)
-        unit_pool, factor_bot = cls._parse_unit_comps(unit_pool, bottom_units, -1)
-        return (factor_top/factor_bot, unit_pool)
 
-    def _translate_to_base(self) -> None:
-        factor_, unit_pool_ = self._split_unit(self.label_unit)
-        factor_ = self.base_factor * factor_
-        while len(unit_pool_)>0:
-            (name, exponent) = unit_pool_.pop(0)
-            if name in BASE_UNITS:
-                self._update_base_repr(name, exponent)
-            if name in DERIVED_UNITS|RELATED_UNITS:
-                new_label = (DERIVED_UNITS|RELATED_UNITS)[name][1]
-                new_factor1 = (DERIVED_UNITS|RELATED_UNITS)[name][0]
-                new_factor2, new_pool = self._split_unit(new_label)
-                for comp in new_pool:
-                    unit_pool_.append((comp[0], exponent*comp[1]))
-                factor_ *= (new_factor2*new_factor1)**np.sign(exponent)
-            self.base_factor = factor_
-        return None
+    def __repr__(self) -> str:
+        return f"[{self.label_unit}]"
+    
+    def __eq__(self, other) -> bool:
+        if isinstance(other, Unit):
+            return (
+                abs(self.base_factor-other.base_factor) < self._tol
+                and (self.base_exps == other.base_exps)
+            )
+        return False
+
+    def __mul__(self, other: Unit) -> Unit:
+        if not isinstance(other, Unit):
+            raise TypeError("Can only multiply Unit by Unit")
+        base_factor = self.base_factor * other.base_factor
+        base_exps = {k: self.base_exps[k] + other.base_exps[k] for k in self.base_exps}
+        base_exps = UnitDict(**base_exps)
+        unit_result = Unit("-", base_factor)
+        unit_result.base_exps = base_exps
+        unit_result._set_labels(
+            self._label_top + other._label_top,
+            self._label_bottom + other._label_bottom,
+        )
+        return unit_result
+    
+    def __truediv__(self, other: Unit) -> Unit:
+        if not isinstance(other, Unit):
+            raise TypeError("Can only divide Unit by Unit")
+        base_factor = self.base_factor / other.base_factor
+        base_exps = {k: self.base_exps[k] - other.base_exps[k] for k in self.base_exps}
+        base_exps = UnitDict(**base_exps)
+        unit_result = Unit("-", base_factor)
+        unit_result.base_exps = base_exps
+        unit_result._set_labels(
+            self._label_top + other._label_bottom,
+            self._label_bottom + other._label_top,
+        )
+        return unit_result
+    
+    @property
+    def si(self) -> str:
+        """
+        Returns the unit in base SI representation.
+        The base SI representation is a string with the base factor and the base units in integer exponents
+        """
+        top_str = ""
+        bottom_str = ""
+        d = [(k,v) for (k,v) in self.base_exps.items() if isinstance(v,int)]
+        for (comp,exp) in d:
+            if exp>0:
+                expr = f"{comp}{abs(exp)}" if exp>1 else f"{comp}"
+                if top_str == "":
+                    top_str = expr
+                else:
+                    top_str = top_str + f"-{expr}"
+            elif exp<0:
+                expr = f"{comp}{abs(exp)}" if exp<-1 else f"{comp}"
+                if bottom_str == "":
+                    bottom_str = expr
+                else:
+                    bottom_str = bottom_str + f"-{expr}"
+            else:
+                continue
+        if bottom_str == "":
+            return f"{self.base_factor:.2e}[{top_str}]" if top_str != "" else "-"
+        else:
+            return f"{self.base_factor:.2e}[{top_str if top_str != "" else "1"}/{bottom_str}]"
+
+    @property
+    def label_unit(self) -> str:
+        if self._label_unit_cache is None:
+            label_unit = "-"
+            for label in self._label_top:
+                label_unit = _mul_units(label_unit, label)
+            for label in self._label_bottom:
+                label_unit = _div_units(label_unit, label)
+            self._label_unit_cache = label_unit
+        return self._label_unit_cache
+
+    @property
+    def u(self)->str:
+        """
+        Returns the unit label.
+        This is just a shorter alias for label_unit."""
+        return self.label_unit
+
+    def compatible(self) -> list[str]:
+        return (
+            [
+                label for label in (BASE_UNITS | DERIVED_UNITS | RELATED_UNITS)
+                if self.base_exps == Unit(label).base_exps
+            ] + [
+                u for u in COMMON_QUANTITIES.values()
+                if self.base_exps == Unit(u).base_exps
+            ]
+        )
 
 def _conv_temp(temp: Var|Array, unit: str|None) -> float|np.ndarray:
     if temp.value is None or unit is None:
