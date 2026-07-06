@@ -1,7 +1,7 @@
 ID,name,description,stage,charge
 000,antupy wishlist,"this is the wishlist of tasks and improvements",None,DavidSaldivia,
-001,frame class,refactor Frame and migrate to polars,wip,,DavidSaldivia,
-002,update Unit class,update the way it handles multiplications and divisions of units,None,DavidSaldivia,
+001,frame class,refactor Frame and migrate to polars,wip,DavidSaldivia,
+002,update core class,update how Unit handles multiplications and divisions of units,None,DavidSaldivia,
 002,dewh's mwe,minimal workable example of a DEWH module's simulation,wip,DavidSaldivia,
 003,csp's mwe,minimal workable example of a CSP module's simulation,wip,DavidSaldivia,
 004,documentation,improve/develop documentation,wip,

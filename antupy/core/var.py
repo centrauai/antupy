@@ -207,7 +207,7 @@ class Var():
         if self.unit == other.unit:
             return Var(self.value - other.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Var(self.value - other.gv(self.unit.label_unit), self.unit)
+            return Var(self.value - other.gv(self.unit.u), self.unit)
         else:
             raise TypeError(f"Cannot subtract {self.unit} with {other.unit}. Units are not compatible.")
 
@@ -220,7 +220,7 @@ class Var():
         if self.unit == other.unit:
             return Var(self.value + other.value, other.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Var(other.value + self.gv(other.unit.label_unit), other.unit)
+            return Var(other.value + self.gv(other.unit.u), other.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
 
