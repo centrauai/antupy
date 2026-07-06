@@ -617,7 +617,7 @@ class TestUnitsConsistency:
         expected_units = {
             'subsystem.temperature': 'K',
             'flow_rate': 'm3/s',
-            'operating_mode': '',
+            'operating_mode': '-',
             'efficiency': '-',
             'power_output': 'W',
             'temperature_out': 'K',

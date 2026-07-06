@@ -6,7 +6,7 @@ import math
 import re
 
 import numpy as np
-from antupy.core.units import Unit, _assign_unit, _conv_temp, _mul_units, _div_units
+from antupy.core.units import Unit, _conv_temp
 
 
 def CF(unit1: str|Unit, unit2: str|Unit) -> Var:
@@ -88,18 +88,12 @@ def CF(unit1: str|Unit, unit2: str|Unit) -> Var:
     Var.gv : Get value in different units
     antupy.units.Unit : The underlying unit representation
     """
-    if isinstance(unit1, Unit):
-        u1 = unit1
-    else:
-        u1 = Unit(unit1)    
-    if isinstance(unit2, Unit):
-        u2 = unit2
-    else:
-        u2 = Unit(unit2)
+    u1 = unit1 if isinstance(unit1, Unit) else Unit(unit1)
+    u2 = unit2 if isinstance(unit2, Unit) else Unit(unit2)
     if u1.base_exps == u2.base_exps:
         return Var(
             u1.base_factor / u2.base_factor,
-            _div_units(u2.label_unit, u1.label_unit)
+            u2/u1
         )
     else:
         raise ValueError(f"{unit1} and {unit2} are not compatible.")
@@ -177,12 +171,12 @@ class Var():
             object.__setattr__(self, "value", self._value.v)
             object.__setattr__(self, "unit", self._value.unit)
         elif isinstance(self._value, Var) and self._unit is not None:
-            unit_ = _assign_unit(self._unit)
-            object.__setattr__(self, "value", self._value.gv(unit_.label_unit))
+            unit_ = Unit(self._unit)
+            object.__setattr__(self, "value", self._value.gv(unit_))
             object.__setattr__(self, "unit", unit_)
         else:
             object.__setattr__(self, "value", self._value)
-            object.__setattr__(self, "unit", _assign_unit(self._unit))
+            object.__setattr__(self, "unit", Unit(self._unit))
 
 
     def __add__(self, other: Self):
@@ -194,7 +188,7 @@ class Var():
         if self.unit == other.unit:
             return Var(self.value + other.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Var(self.value + other.gv(self.unit.label_unit), self.unit)
+            return Var(self.value + other.gv(self.unit), self.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
         
@@ -207,7 +201,7 @@ class Var():
         if self.unit == other.unit:
             return Var(self.value - other.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Var(self.value - other.gv(self.unit.u), self.unit)
+            return Var(self.value - other.gv(self.unit), self.unit)
         else:
             raise TypeError(f"Cannot subtract {self.unit} with {other.unit}. Units are not compatible.")
 
@@ -220,7 +214,7 @@ class Var():
         if self.unit == other.unit:
             return Var(self.value + other.value, other.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Var(other.value + self.gv(other.unit.u), other.unit)
+            return Var(other.value + self.gv(other.unit), other.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
 
@@ -228,8 +222,8 @@ class Var():
         """ Overloading the multiplication operator. """
         if isinstance(other, Var):
             if self.value is None or other.value is None:
-                return Var(None, _mul_units(self.unit.u, other.unit.u))
-            return Var(self.value * other.value, _mul_units(self.unit.u, other.unit.u))
+                return Var(None, self.unit * other.unit)
+            return Var(self.value * other.value, self.unit * other.unit)
         elif isinstance(other, (int, float)):
             if self.value is None:
                 return Var(None, self.unit)
@@ -241,8 +235,8 @@ class Var():
         """ Overloading the multiplication operator. """
         if isinstance(other, Var):
             if self.value is None or other.value is None:
-                return Var(None, _mul_units(other.unit.u, self.unit.u))
-            return Var(self.value * other.value, _mul_units(other.unit.u, self.unit.u))
+                return Var(None, other.unit * self.unit)
+            return Var(self.value * other.value, other.unit * self.unit)
         elif isinstance(other, (int, float)):
             if self.value is None:
                 return Var(None, self.unit)
@@ -254,8 +248,8 @@ class Var():
         """ Overloading the division operator. """
         if isinstance(other, Var):
             if self.value is None or other.value is None:
-                return Var(None, _div_units(self.unit.u, other.unit.u))
-            return Var(self.value / other.value, _div_units(self.unit.u, other.unit.u))
+                return Var(None, self.unit / other.unit)
+            return Var(self.value / other.value, self.unit / other.unit)
         elif isinstance(other, (int, float)):
             if self.value is None:
                 return Var(None, self.unit)
@@ -267,7 +261,7 @@ class Var():
         if isinstance(other, (int, float)):
             if self.value is None:
                 return Var(None, self.unit)
-            return Var(other / self.value, _div_units("-", self.unit.u))
+            return Var(other / self.value, Unit("-") / self.unit)
         else:
             return NotImplemented
     
@@ -284,13 +278,13 @@ class Var():
         if other.value is None:
             return False
         return (
-            self.value == other.value * CF(other.unit.u, self.unit.u).v
+            self.value == other.value * CF(other.unit, self.unit).v
             and self.unit.base_exps == other.unit.base_exps
         )
 
     def __lt__(self, other) -> bool:
         if isinstance(other, Var):
-            return self.v < other.gv(self.unit.u)
+            return self.v < other.gv(self.unit)
         elif isinstance(other, (int,float)):
             return self.v < other
         else:
@@ -298,7 +292,7 @@ class Var():
         
     def __le__(self, other) -> bool:
         if isinstance(other, Var):
-            return self.v <= other.gv(self.unit.u)
+            return self.v <= other.gv(self.unit)
         elif isinstance(other, (int,float)):
             return self.v <= other
         else:
@@ -306,7 +300,7 @@ class Var():
         
     def __gt__(self, other) -> bool:
         if isinstance(other, Var):
-            return self.v > other.gv(self.unit.u)
+            return self.v > other.gv(self.unit)
         elif isinstance(other, (int,float)):
             return self.v > other
         else:
@@ -314,7 +308,7 @@ class Var():
         
     def __ge__(self, other) -> bool:
         if isinstance(other, Var):
-            return self.v >= other.gv(self.unit.u)
+            return self.v >= other.gv(self.unit)
         elif isinstance(other, (int,float)):
             return self.v >= other
         else:
@@ -384,29 +378,33 @@ class Var():
             # Fallback for unrecognized format specs
             return f"{self.value} [{self.unit.u}]"
 
-    def get_value(self, unit: str | None = None) -> float:
+    def get_value(self, unit: str|Unit|None = None) -> float:
         """ Method to obtain the value of the variable in the requested unit.
         If the unit is not compatible with the variable unit, an error is raised.
         If the unit is None, the value is returned in the Var's label unit.
         """
-        if unit is None:
-            unit = self.unit.u
         if self.value is None:
             raise ValueError("Var value is None.")
+        if unit is None:
+            unit = self.unit
+        if isinstance(unit, str):
+            if unit in ["°C", "degC","K"]:
+                return float(_conv_temp(self, unit))
+            unit = Unit(unit)
+        
         if self.unit == unit:
             return self.value
         if self.unit.base_exps == Unit(unit).base_exps:
-            if unit in ["°C", "degC","K"]:
-                return float(_conv_temp(self, unit))
-            return self.value * CF(self.unit.u, unit).v
+            return self.value * CF(self.unit, unit).v
         else:
             raise ValueError( f"Var unit ({self.unit}) and wanted unit ({unit}) are not compatible.")
     
-    def set_unit(self, unit: str | None = None) -> Var:
+    def set_unit(self, unit: str|Unit) -> Var:
         """ Set the primary unit of the variable. """
-        unit = str(unit)
-        if (self.unit.base_exps == Unit(unit).base_exps) and (self.value is not None):
-            return Var(self.value * CF(self.unit, unit).v, Unit(unit))
+        if isinstance(unit, str):
+            unit = Unit(unit)
+        if (self.unit.base_exps == unit.base_exps) and (self.value is not None):
+            return Var(self.value * CF(self.unit, unit).v, unit)
         else:
             raise ValueError(
                 f"unit ({unit}) is not compatible with existing unit label ({self.unit})."
@@ -422,11 +420,11 @@ class Var():
         """ Property to obtain the value of the variable in its label unit. """
         return self.value if self.value is not None else np.nan
 
-    def gv(self, unit: str|None = None) -> float:
+    def gv(self, unit: str|Unit|None = None) -> float:
         """Alias for self.get_value()"""
         return self.get_value(unit)
     
-    def su(self, unit: str|None = None) -> Var:
+    def su(self, unit: str|Unit) -> Var:
         """Alias of self.set_unit"""
         return self.set_unit(unit)
     

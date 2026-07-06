@@ -3,8 +3,7 @@ from dataclasses import dataclass, field
 from typing import Self
 
 import numpy as np
-from antupy.core.units import Unit, _conv_temp, _mul_units, _div_units, _assign_unit
-
+from antupy.core.units import Unit, _conv_temp
 from antupy.core.var import CF, Var
 
 @dataclass(frozen=True)
@@ -90,12 +89,12 @@ class Array():
             object.__setattr__(self, "value", self._value.value)
             object.__setattr__(self, "unit", self._value.unit)
         elif isinstance(self._value, Array) and self._unit is not None:
-            unit_ = _assign_unit(self._unit)
-            object.__setattr__(self, "value", self._value.gv(unit_.label_unit))
+            unit_ = Unit(self._unit)
+            object.__setattr__(self, "value", self._value.gv(unit_))
             object.__setattr__(self, "unit", unit_)
         else:
             object.__setattr__(self, "value", np.array(self._value))
-            object.__setattr__(self, "unit", _assign_unit(self._unit))
+            object.__setattr__(self, "unit", Unit(self._unit))
 
     def __add__(self, other: Self|Var):
         """ Overloading the addition operator. """
@@ -104,7 +103,7 @@ class Array():
         if self.unit == other.unit:
             return Array(self.value + other.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Array(self.value + other.gv(self.unit.label_unit), self.unit)
+            return Array(self.value + other.gv(self.unit), self.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")
     
@@ -115,7 +114,7 @@ class Array():
         if self.unit == other.unit:
             return Array(self.value + other.value, other.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Array(other.value + self.gv(other.unit.u), other.unit)
+            return Array(other.value + self.gv(other.unit), other.unit)
         else:
             raise TypeError(f"Cannot add {self.unit} with {other.unit}. Units are not compatible.")    
         
@@ -126,7 +125,7 @@ class Array():
         if self.unit == other.unit:
             return Array(self.value - other.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Array(self.value - other.gv(self.unit.u), self.unit)
+            return Array(self.value - other.gv(self.unit), self.unit)
         else:
             raise TypeError(f"Cannot subtract {self.unit} with {other.unit}. Units are not compatible.")
     
@@ -137,7 +136,7 @@ class Array():
         if self.unit == other.unit:
             return Array(other.value - self.value, self.unit)
         elif self.unit.base_exps == other.unit.base_exps:
-            return Array(other.gv(self.unit.u) - self.value, self.unit)
+            return Array(other.gv(self.unit) - self.value, self.unit)
         else:
             raise TypeError(f"Cannot subtract {self.unit} with {other.unit}. Units are not compatible.")
     
@@ -145,10 +144,10 @@ class Array():
         """ Overloading the multiplication operator. """
         if isinstance(other, (Array, Var)):
             if self.value is None:
-                return Array(None, _mul_units(self.unit.u, other.unit.u))
+                return Array(None, self.unit * other.unit)
             return Array(
                 self.value * other.value,
-                _mul_units(self.unit.u, other.unit.u)
+                self.unit * other.unit
             )
         elif isinstance(other, (int, float)):
             return Array(self.value * other, self.unit)
@@ -159,10 +158,10 @@ class Array():
         """ Overloading the multiplication operator. """
         if isinstance(other, (Array, Var)):
             if self.value is None:
-                return Array(None, _mul_units(other.unit.u, self.unit.u))
+                return Array(None, other.unit * self.unit)
             return Array(
                 other.value * self.value,
-                _mul_units(other.unit.u, self.unit.u)
+                other.unit * self.unit
             )
         elif isinstance(other, (int, float)):
             return Array(self.value * other, self.unit)
@@ -172,7 +171,7 @@ class Array():
     def __truediv__(self, other: Self|Var|float|int):
         """ Overloading the division operator. """
         if isinstance(other, (Array, Var)):
-            return Array(self.value / other.value, _div_units(self.unit.u, other.unit.u))
+            return Array(self.value / other.value, self.unit / other.unit)
         elif isinstance(other, (int, float)):
             if self.value is None:
                 return Array(None, self.unit)
@@ -183,11 +182,11 @@ class Array():
     def __rtruediv__(self, other: Self|Var|float|int):
         """ Overloading the division operator. """
         if isinstance(other, (Array, Var)):
-            return Array(other.value / self.value, _div_units(other.unit.u, self.unit.u))
+            return Array(other.value / self.value, other.unit / self.unit)
         elif isinstance(other, (int, float)):
             if self.value is None:
-                return Array(None, _div_units("", self.unit.u))
-            return Array(other / self.value, _div_units("", self.unit.u))
+                return Array(None, Unit("-") / self.unit)
+            return Array(other / self.value, Unit("-") / self.unit)
         else:
             raise TypeError(f"Cannot divide {type(other)} by {type(self)}")
 
@@ -196,7 +195,7 @@ class Array():
         if not isinstance(other, Array) or other._value is None:
             return False
         return (
-            np.allclose(self.value, other.value * CF(other.unit.u, self.unit.u).v)
+            np.allclose(self.value, other.value * CF(other.unit, self.unit).v)
             and self.unit.base_exps == other.unit.base_exps
         )
     
@@ -212,27 +211,30 @@ class Array():
     def __repr__(self) -> str:
         return f"{self.value:} [{self.unit.u}]"
 
-    def get_value(self, unit: str | None = None) -> np.ndarray:
+    def get_value(self, unit: str|Unit|None = None) -> np.ndarray:
         """ Method to obtain the value of the variable in the requested unit.
         If the unit is not compatible with the variable unit, an error is raised.
         If the unit is None, the value is returned in the variable unit.
         """
         if unit is None:
-            unit = self.unit.u
-        if self.unit == unit:
-            return self.value
-        if self.unit.base_exps == Unit(unit).base_exps:
+            unit = self.unit
+        if isinstance(unit, str):
             if unit in ["°C", "degC","K"]:
                 return np.array(_conv_temp(self, unit))
-            return self.value * CF(self.unit.u, unit).v
+            unit = Unit(unit)
+        if self.unit == unit:
+            return self.value
+        if self.unit.base_exps == unit.base_exps:
+            return self.value * CF(self.unit, unit).v
         else:
             raise ValueError( f"Var unit ({self.unit}) and wanted unit ({unit}) are not compatible.")
 
-    def set_unit(self, unit: str | None = None) -> Array:
+    def set_unit(self, unit: str|Unit) -> Array:
         """ Set the primary unit of the variable. """
-        unit = str(unit)
-        if (self.unit.base_exps == Unit(unit).base_exps) and (self.value is not None):
-            return Array(self.value * CF(self.unit, unit).v, Unit(unit))
+        if isinstance(unit, str):
+            unit = Unit(unit)
+        if (self.unit.base_exps == unit.base_exps) and (self.value is not None):
+            return Array(self.value * CF(self.unit, unit).v, unit)
         else:
             raise ValueError(
                 f"unit ({unit}) is not compatible with existing primary unit ({self.unit})."
@@ -248,11 +250,11 @@ class Array():
         """ Property to obtain the value of the variable in its label unit. """
         return self.value
 
-    def gv(self, unit:str|None = None) -> np.ndarray:
+    def gv(self, unit:str|Unit|None = None) -> np.ndarray:
         """Alias for self.get_value()"""
         return self.get_value(unit)
     
-    def su(self, unit: str|None = None) -> Array:
+    def su(self, unit: str|Unit) -> Array:
         """Alias of self.set_unit"""
         return self.set_unit(unit)
     
@@ -260,24 +262,24 @@ class Array():
         """ Return a list of compatible units for the variable unit. """
         return self.unit.compatible()
     
-    def mean(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
+    def mean(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Var(self.gv(u).mean(), u)
     
-    def std(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
+    def std(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Var(self.gv(u).std(), u)
     
-    def var(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
-        return Var(self.gv(u).var(), _mul_units(u, u))
+    def var(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
+        return Var(self.gv(u).var(), u*u)
     
-    def max(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
+    def max(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Var(self.gv(u).max(), u)
     
-    def min(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
+    def min(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Var(self.gv(u).min(), u)
     
     def argmax(self) -> int:
@@ -286,25 +288,25 @@ class Array():
     def argmin(self) -> int:
         return int(np.argmin(self.v))
 
-    def sum(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
+    def sum(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Var(self.gv(u).sum(), u)
     
-    def prod(self, unit: str | None = None) -> Var:
-        u = self.u if unit is None else unit
-        u_f = ""
+    def prod(self, unit: str | Unit | None = None) -> Var:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
+        u_f = Unit("-")
         for _ in range(len(self)):
-            u_f = _mul_units(u, u_f)
+            u_f = u*u_f
         return Var(self.gv(u).prod(), u_f)
     
-    def cumsum(self, unit: str | None = None) -> Array:
-        u = self.u if unit is None else unit
+    def cumsum(self, unit: str | Unit | None = None) -> Array:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Array(self.gv(u).cumsum(), u)
     
-    def sort(self, unit: str | None = None) -> Array:
-        u = self.u if unit is None else unit
+    def sort(self, unit: str | Unit | None = None) -> Array:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Array(self.gv(u).sort(), u)
     
-    def round(self, decimals: int = 0, unit: str | None = None) -> Array:
-        u = self.u if unit is None else unit
+    def round(self, decimals: int = 0, unit: str | Unit | None = None) -> Array:
+        u = Unit(unit) if isinstance(unit, str) else self.unit if unit is None else unit
         return Array(np.round(self.gv(u), decimals), u)
