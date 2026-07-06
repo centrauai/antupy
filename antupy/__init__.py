@@ -7,6 +7,7 @@ from antupy.sim.plant import Plant, component, constraint, derived
 from antupy.sim.par import Parametric
 
 from antupy.utils import props, htc, solar, loc
+from antupy.utils.fluidstate import FluidState
 
 __all__ = [
     "Unit",
@@ -15,4 +16,5 @@ __all__ = [
     "component", "constraint", "derived",
     "Parametric",
     "props", "htc", "solar", "loc",
+    "FluidState",
 ]

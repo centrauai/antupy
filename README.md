@@ -97,6 +97,15 @@ q_stg = vol_tank * rho * cp * (temp_max - temp_mains)
 print(f"Energy stored: {q_stg.su('kWh'):.1f}")  # Output in kWh
 ```
 
+Now, you can also use a CoolProp wrapper called `FluidState` to retrieve properties of any fluid. You need to provide two independent properties to specify the state. If only one property is given, it is flagged as "ISO-CURVE". You can update a state using the `.update()` method. If more than two properties are provided, the state is flagged as "OVERDETERMINED" and a warning is raised. The `lazy` argument allows to delay the calculation of the state until a property is requested. All the fluids have the following available properties: `temp`, `p`, `rho`, `h`, `s`, `cp`, `cv`, `mu`, and `k`. The units are automatically handled by the `Var` class.
+
+```python
+import antupy as ap
+
+fs = ap.FluidState(fluid="water", temp=ap.Var(60, "degC"), p=ap.Var(2, "MPa"))
+print(f"Density: {fs.rho.su('kg/m3'):.2f}")
+```
+
 This is the basic usage. For deeper usage and the use of the simulation classes such as `Plant` and `Parametric`, see the `documentation`.
 
 So far, some research projects that have used antupy:
