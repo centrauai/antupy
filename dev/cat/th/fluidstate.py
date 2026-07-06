@@ -1,4 +1,5 @@
 from typing import Literal, Self
+import warnings
 
 import numpy as np
 from antupy.core.units import Unit
@@ -24,6 +25,16 @@ _STATUS_STATE = Literal[
     "DETERMINED",
     "DETERMINABLE",
     "OVERDETERMINED"
+]
+
+_PHASE = Literal[
+    "liquid",
+    "gas",
+    "twophase",
+    "supercritical_liquid",
+    "supercritical_gas",
+    "supercritical",
+    "not_imposed",
 ]
 
 _PROPS_COOLPROP: dict[str, tuple[str, str]] = {
@@ -90,6 +101,7 @@ class FluidState():
     ):
 
         self.status: _STATUS_STATE = "CLEAN"
+        self.phase: _PHASE = "not_imposed"
         self.fluid_index: int = _fluid_index(fluid)
         self.fluid_label: str = fluid
         self._temp: Var = temp
@@ -119,17 +131,29 @@ class FluidState():
 
         if count_provided == 0:
             self.status = "CLEAN"
-            print(f"Warning: No property provided. The state is CLEAN and not solved.")
+            warnings.warn(
+                "No property provided. The state is CLEAN and not solved.",
+                UserWarning,
+                stacklevel=2,
+            )
             return
         elif count_provided == 1:
             self.status = "ISO-CURVE"
-            print(f"Warning: Only 1 property provided. The state is ISO-CURVE and cannot be solved. You need one property more. Provided property: {props_provided[0]}.")
+            warnings.warn(
+                "The status is ISO-CURVE, it is not a state, you need to provide another variable. You can use the method .update().",
+                UserWarning,
+                stacklevel=2,
+            )
             return
         elif count_provided == 2:
             self.status = "DETERMINABLE"
         elif count_provided > 2:
             self.status = "OVERDETERMINED"
-            print(f"Warning: More than 2 properties provided to solve the state. Provided properties: {props_provided}. Only the first 2 will be used to solve the state.")
+            warnings.warn(
+                f"More than 2 properties provided to solve the state. Provided properties: {props_provided}. Only the first 2 will be used to solve the state.",
+                UserWarning,
+                stacklevel=2,
+            )
 
         if self.status in ["DETERMINABLE", "OVERDETERMINED"]:
             prop_1_label = props_provided[0]
@@ -153,6 +177,13 @@ class FluidState():
                         _PROPS_COOLPROP[prop_required][1]
                     )
                     setattr(self, f"_{prop_required}", prop_returned)
+                self.phase = CP.PhaseSI(
+                    _PROPS_COOLPROP[prop_1_label][0],
+                    value_1,
+                    _PROPS_COOLPROP[prop_2_label][0],
+                    value_2,
+                    _LIST_FLUIDS_COOLPROP[self.fluid_index]
+                )
                 self.status = "DETERMINED"
             except Exception as err:
                 raise err
@@ -231,9 +262,62 @@ class FluidState():
         return f"FluidState(fluid={self.fluid_label}, temp={self._temp}, rho={self._rho}, p={self._p}, v={self._v}, u={self._u}, h={self._h}, s={self._s}, q={self._q})"
     
     def update(self, **kwargs) -> Self:
+        
+        _n_props_provided_original = len(self.props_provided)
+        _n_props_provided_new = len(kwargs)
+        _n_props_provided_common = len(set(self.props_provided).intersection(set(kwargs.keys())))
+
+        if _n_props_provided_new == 0:
+            # Nothing to do here innit
+            return self
+
+        if _n_props_provided_new == 1 and _n_props_provided_original == 1:
+            # Alright, this should be easy to implement, just update the state with the new property and solve it again.
+            # If _n_props_provided_common == 1, then the state is updated to a new ISO-CURVE inside _solve_state().
+            setattr(self, f"_{list(kwargs.keys())[0]}", list(kwargs.values())[0])
+            self._solve_state()
+            return self
+
+        if _n_props_provided_new == 1 and _n_props_provided_common == 1:
+            # Alright, this should be simple too. The state is updated to a new value of one of the given prop. Similar to previous one.
+            setattr(self, f"_{list(kwargs.keys())[0]}", list(kwargs.values())[0])
+            self._solve_state()
+            return self
+
+        if _n_props_provided_new == 1 and _n_props_provided_common == 0:
+            # What to do here? Just return a new FluidState with the given property and the first one of the old ones. Print a warning that says the second props_provided (index 1), won't be used.
+            prop_1_label = list(kwargs.keys())[0]
+            prop_2_label = self.props_provided[0]
+            value_2 = Var(getattr(self, f"_{prop_2_label}"))
+            value_1 = list(kwargs.values())[0]
+            warnings.warn(
+                f"The given property ({prop_1_label}) and the first property already given ({prop_2_label}) will be used to solve the state. The second given previously ({self.props_provided[1]}) will not be used.",
+                UserWarning,
+                stacklevel=2,
+            )
+            self._clean_state()
+            setattr(self, f"_{prop_1_label}", value_1)
+            setattr(self, f"_{prop_2_label}", value_2)
+            self._solve_state()
+            return self
+        
+        if _n_props_provided_new >= 2:
+            # Just update the state and solve it. This case just completely disregard previous data.
+            self._clean_state()
+            for key, value in kwargs.items():
+                if key not in _PROPS_COOLPROP.keys():
+                    raise ValueError(f"Property {key} is not a valid property. Valid properties are: {_PROPS_COOLPROP.keys()}.")    
+                setattr(self, f"_{key}", value)
+            self._solve_state()
+            return self
+
         for key, value in kwargs.items():
             if key not in _PROPS_COOLPROP.keys():
                 raise ValueError(f"Property {key} is not a valid property. Valid properties are: {_PROPS_COOLPROP.keys()}.")
+
+            if key in self.props_provided:
+                # If this is the only 
+                ...
             if key not in self.props_provided:
                 ...
             elif key == self.props_provided[0]:
@@ -243,6 +327,19 @@ class FluidState():
             else:
                 raise ValueError("Something went wrong. This should not happen.")
         return self
+    
+    def _clean_state(self):
+        self.status = "CLEAN"
+        self.props_provided = []
+        self._temp = Var(None, "K")
+        self._rho = Var(None, "kg/m3")
+        self._p = Var(None, "kPa")
+        self._v = Var(None, "m3/kg")
+        self._u = Var(None, "kJ/kg")
+        self._h = Var(None, "kJ/kg")
+        self._s = Var(None, "kJ/kg-K")
+        self._q = Var(None,"-")
+        return
 
 
 def main():
@@ -279,6 +376,8 @@ def main():
         ),
     ]
     for state in states:
+        print(state.status)
+        print(state.phase)
         print(state.temp)
         print(state.p)
         print(state.v)

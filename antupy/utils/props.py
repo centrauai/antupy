@@ -1,11 +1,87 @@
 from dataclasses import dataclass
-from typing import Protocol
+from typing import Protocol, overload
 
 import CoolProp.CoolProp as CP
 import numpy as np
 
 from antupy.core.var import Var
 from antupy.core.array import Array
+
+
+@overload
+def _coolprop_two_input_prop(
+    output_key: str,
+    out_unit: str,
+    fluid: str,
+    input_key_1: str,
+    value_1: Var,
+    unit_1: str,
+    input_key_2: str,
+    value_2: Var,
+    unit_2: str,
+) -> Var: ...
+
+
+@overload
+def _coolprop_two_input_prop(
+    output_key: str,
+    out_unit: str,
+    fluid: str,
+    input_key_1: str,
+    value_1: Var,
+    unit_1: str,
+    input_key_2: str,
+    value_2: Array,
+    unit_2: str,
+) -> Array: ...
+
+
+@overload
+def _coolprop_two_input_prop(
+    output_key: str,
+    out_unit: str,
+    fluid: str,
+    input_key_1: str,
+    value_1: Array,
+    unit_1: str,
+    input_key_2: str,
+    value_2: Var,
+    unit_2: str,
+) -> Array: ...
+
+
+@overload
+def _coolprop_two_input_prop(
+    output_key: str,
+    out_unit: str,
+    fluid: str,
+    input_key_1: str,
+    value_1: Array,
+    unit_1: str,
+    input_key_2: str,
+    value_2: Array,
+    unit_2: str,
+) -> Array: ...
+
+
+def _coolprop_two_input_prop(
+    output_key: str,
+    out_unit: str,
+    fluid: str,
+    input_key_1: str,
+    value_1: Var | Array,
+    unit_1: str,
+    input_key_2: str,
+    value_2: Var | Array,
+    unit_2: str,
+) -> Var | Array:
+    value_si_1 = value_1.gv(unit_1)
+    value_si_2 = value_2.gv(unit_2)
+    output = CP.PropsSI(output_key, input_key_1, value_si_1, input_key_2, value_si_2, fluid)
+
+    if isinstance(value_1, Var) and isinstance(value_2, Var):
+        return Var(output, out_unit)
+    return Array(output, out_unit)
 
 def _return_default_prop(default_value: Var, temp: Var|Array) -> Var|Array:
     if isinstance(temp, Var):
@@ -127,64 +203,22 @@ class Glass():
 
 class Water():
     def rho(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('D', 'T', T, 'P', P, 'Water'), "kg/m3")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('D', 'T', T, 'P', P, 'Water'), "kg/m3")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("D", "kg/m3", "Water", "T", temp, "K", "P", p, "Pa")
 
     def cp(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('C', 'T', T, 'P', P, 'Water'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('C', 'T', T, 'P', P, 'Water'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("C", "J/kg-K", "Water", "T", temp, "K", "P", p, "Pa")
 
     def k(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('L', 'T', T, 'P', P, 'Water'), "W/m-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('L', 'T', T, 'P', P, 'Water'), "W/m-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("L", "W/m-K", "Water", "T", temp, "K", "P", p, "Pa")
 
     def mu(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('V', 'T', T, 'P', P, 'Water'), "Pa-s")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('V', 'T', T, 'P', P, 'Water'), "Pa-s")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("V", "Pa-s", "Water", "T", temp, "K", "P", p, "Pa")
         
     def h(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('H', 'T', T, 'P', P, 'Water'), "J/kg")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('H', 'T', T, 'P', P, 'Water'), "J/kg")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("H", "J/kg", "Water", "T", temp, "K", "P", p, "Pa")
         
     def s(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('S', 'T', T, 'P', P, 'Water'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('S', 'T', T, 'P', P, 'Water'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("S", "J/kg-K", "Water", "T", temp, "K", "P", p, "Pa")
 
     def alpha(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
         return (self.k(temp, p) / (self.rho(temp, p) * self.cp(temp, p)))
@@ -192,64 +226,22 @@ class Water():
 
 class Air():
     def rho(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('D', 'T', T, 'P', P, 'Air'), "kg/m3")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('D', 'T', T, 'P', P, 'Air'), "kg/m3")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("D", "kg/m3", "Air", "T", temp, "K", "P", p, "Pa")
         
     def cp(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('C', 'T', T, 'P', P, 'Air'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('C', 'T', T, 'P', P, 'Air'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("C", "J/kg-K", "Air", "T", temp, "K", "P", p, "Pa")
     
     def k(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('L', 'T', T, 'P', P, 'Air'), "W/m-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('L', 'T', T, 'P', P, 'Air'), "W/m-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("L", "W/m-K", "Air", "T", temp, "K", "P", p, "Pa")
 
     def mu(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('V', 'T', T, 'P', P, 'Air'), "Pa-s")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('V', 'T', T, 'P', P, 'Air'), "Pa-s")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("V", "Pa-s", "Air", "T", temp, "K", "P", p, "Pa")
     
     def h(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('H', 'T', T, 'P', P, 'Air'), "J/kg")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('H', 'T', T, 'P', P, 'Air'), "J/kg")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("H", "J/kg", "Air", "T", temp, "K", "P", p, "Pa")
     
     def s(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('S', 'T', T, 'P', P, 'Air'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('S', 'T', T, 'P', P, 'Air'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("S", "J/kg-K", "Air", "T", temp, "K", "P", p, "Pa")
         
     def alpha(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
         return (self.k(temp, p) / (self.rho(temp, p) * self.cp(temp, p)))
@@ -257,64 +249,22 @@ class Air():
 
 class CO2():
     def rho(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('D', 'T', T, 'P', P, 'CO2'), "kg/m3")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('D', 'T', T, 'P', P, 'CO2'), "kg/m3")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("D", "kg/m3", "CO2", "T", temp, "K", "P", p, "Pa")
     
     def cp(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('C', 'T', T, 'P', P, 'CO2'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('C', 'T', T, 'P', P, 'CO2'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("C", "J/kg-K", "CO2", "T", temp, "K", "P", p, "Pa")
 
     def k(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('L', 'T', T, 'P', P, 'CO2'), "W/m-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('L', 'T', T, 'P', P, 'CO2'), "W/m-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("L", "W/m-K", "CO2", "T", temp, "K", "P", p, "Pa")
 
     def mu(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('V', 'T', T, 'P', P, 'CO2'), "Pa-s")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('V', 'T', T, 'P', P, 'CO2'), "Pa-s")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("V", "Pa-s", "CO2", "T", temp, "K", "P", p, "Pa")
 
     def h(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('H', 'T', T, 'P', P, 'CO2'), "J/kg")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('H', 'T', T, 'P', P, 'CO2'), "J/kg")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("H", "J/kg", "CO2", "T", temp, "K", "P", p, "Pa")
 
     def s(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
-        T = temp.gv("K")
-        P = p.gv("Pa")
-        if isinstance(temp, Var) and isinstance(p, Var):
-            return Var(CP.PropsSI('S', 'T', T, 'P', P, 'CO2'), "J/kg-K")
-        elif isinstance(temp, Array) or isinstance(p, Array):
-            return Array(CP.PropsSI('S', 'T', T, 'P', P, 'CO2'), "J/kg-K")
-        else:
-            raise ValueError(f"{type(temp)=} and {type(p)=} are not valid types")
+        return _coolprop_two_input_prop("S", "J/kg-K", "CO2", "T", temp, "K", "P", p, "Pa")
 
     def alpha(self, temp: Var|Array = Var(273.15, "K"), p: Var|Array = Var(101325, "Pa")) -> Var|Array:
         return (self.k(temp, p) / (self.rho(temp, p) * self.cp(temp, p)))
