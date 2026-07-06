@@ -29,9 +29,6 @@ Conda is still not implemented as a distribution method, but it is planned for t
 
 This is an open-source initiative. You can download the source code and use it freely. Look at the toml file. If you want to contribute, please contact the author or raise an issue.
 
-```
-All the core classes have two main methods to interact with them: `.gv(str)` (or `.get_value(str)`, where `str` is any valid unit string) and `.su(str)` (or `.set_unit(str)`). `.gv(str)` allows you to retrieve the data (as float, np.ndarray, or pl.DataFrame) from your antupy variables, while `.su(str)` allows you to change the units in which the data is stored. This is useful to check wheter a variable has the units you expect. You can also use the `compatible()` method, if you are not sure the unit of a variable. You can also retrieve a variable label string using the `.u` (or `.unit`) attribute and the stored data with the `.v` ( or `.value`) attribute. The difference between `.gv()` and `.v` is the last one does not check the units, so use it carefully and under your own responsability.
-
 ### Quick Start - Core Classes
 
 ```python
