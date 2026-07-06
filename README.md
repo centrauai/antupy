@@ -29,7 +29,8 @@ Conda is still not implemented as a distribution method, but it is planned for t
 
 This is an open-source initiative. You can download the source code and use it freely. Look at the toml file. If you want to contribute, please contact the author or raise an issue.
 
-## Examples
+```
+All the core classes have two main methods to interact with them: `.gv(str)` (or `.get_value(str)`, where `str` is any valid unit string) and `.su(str)` (or `.set_unit(str)`). `.gv(str)` allows you to retrieve the data (as float, np.ndarray, or pl.DataFrame) from your antupy variables, while `.su(str)` allows you to change the units in which the data is stored. This is useful to check wheter a variable has the units you expect. You can also use the `compatible()` method, if you are not sure the unit of a variable. You can also retrieve a variable label string using the `.u` (or `.unit`) attribute and the stored data with the `.v` ( or `.value`) attribute. The difference between `.gv()` and `.v` is the last one does not check the units, so use it carefully and under your own responsability.
 
 ### Quick Start - Core Classes
 
@@ -109,6 +110,15 @@ rho = fluid.rho(temp_avg)  # Density [kg/m3]
 # Calculate stored energy
 q_stg = vol_tank * rho * cp * (temp_max - temp_mains)
 print(f"Energy stored: {q_stg.su('kWh'):.1f}")  # Output in kWh
+```
+
+Now, you can also use a CoolProp wrapper called `FluidState` to retrieve properties of any fluid. You need to provide two independent properties to specify the state. If only one property is given, it is flagged as "ISO-CURVE". You can update a state using the `.update()` method. If more than two properties are provided, the state is flagged as "OVERDETERMINED" and a warning is raised. The `lazy` argument allows to delay the calculation of the state until a property is requested. All the fluids have the following available properties: `temp`, `p`, `rho`, `h`, `s`, `cp`, `cv`, `mu`, and `k`. The units are automatically handled by the `Var` class.
+
+```python
+import antupy as ap
+
+fs = ap.FluidState(fluid="water", temp=ap.Var(60, "degC"), p=ap.Var(2, "MPa"))
+print(f"Density: {fs.rho.su('kg/m3'):.2f}")
 ```
 
 This is the basic usage. For deeper usage and the use of the simulation classes such as `Plant` and `Parametric`, see the `documentation`.

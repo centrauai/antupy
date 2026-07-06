@@ -175,7 +175,7 @@ class Var():
     def __post_init__(self):
         if isinstance(self._value, Var) and self._unit is None:
             object.__setattr__(self, "value", self._value.v)
-            object.__setattr__(self, "unit", self._value.u)
+            object.__setattr__(self, "unit", self._value.unit)
         elif isinstance(self._value, Var) and self._unit is not None:
             unit_ = _assign_unit(self._unit)
             object.__setattr__(self, "value", self._value.gv(unit_.label_unit))
@@ -436,6 +436,7 @@ class Var():
 
 
 class C():
+    # Physical constants
     c = Var(299792458, "m/s")  # Speed of light
     G = Var(6.6743015e-11, "m3/kg-s2")  # Gravitational constant
     delta_v_c = Var(9192631770, "Hz") # Hyperfine transition frequency of 133Cs
@@ -450,9 +451,14 @@ class C():
     N_A = Var(6.02214076e23, "1/mol")  # Avogadro constant
     K_cd = Var(683, "lm/W")  # Luminous efficacy of 540 THz radiation
 
+    # Mathematical constants
     pi = Var(math.pi, "-")
     euler = Var(math.e, "-")
     phi = Var((1 + math.sqrt(5)) / 2, "-")
+
+    # Standard conditions
+    temp_std = Var(273.15, "K")  # Standard temperature
+    p_std = Var(101325, "Pa")  # Standard pressure
 
 
 CONSTANTS: dict[str, Var] = {
