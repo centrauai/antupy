@@ -29,7 +29,7 @@ def test_prop_air():
     assert round(air.rho(temp, pressure), 3) == Var(1.177, "kg/m3")
     assert round(air.cp(temp, pressure), 0) == Var(1006, "J/kg-K")
     assert round(air.k(temp, pressure), 3) == Var(0.026, "W/m-K")
-    assert np.round(air.viscosity(temp, pressure).gv("Pa-s") * 1e5, 3) == 1.854
+    assert np.round(air.mu(temp, pressure).gv("Pa-s") * 1e5, 3) == 1.854
 
 def test_prop_humid_air():
     air = HumidAir()
