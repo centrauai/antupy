@@ -4,6 +4,7 @@ from pathlib import Path
 import pytest
 
 import antupy as ap
+from antupy.utils.fluidstate import FluidState
 
 @pytest.mark.parametrize(
     "kwargs",
@@ -17,7 +18,7 @@ import antupy as ap
     ],
 )
 def test_fluidstate_main_examples_solve_to_determined(kwargs):
-    state = ap.FluidState(**kwargs)
+    state = FluidState(**kwargs)
 
     assert state.status == "DETERMINED"
     assert state.phase in {
@@ -42,14 +43,14 @@ def test_fluidstate_main_examples_solve_to_determined(kwargs):
 
 def test_fluidstate_warns_when_no_properties_are_provided():
     with pytest.warns(UserWarning, match="No property provided"):
-        state = ap.FluidState(fluid="water")
+        state = FluidState(fluid="water")
 
     assert state.status == "CLEAN"
 
 
 def test_fluidstate_warns_for_iso_curve_and_update_resolves_state():
     with pytest.warns(UserWarning, match="status is ISO-CURVE"):
-        state = ap.FluidState(fluid="water", temp=ap.Var(300, "K"))
+        state = FluidState(fluid="water", temp=ap.Var(300, "K"))
 
     assert state.status == "ISO-CURVE"
 
@@ -61,7 +62,7 @@ def test_fluidstate_warns_for_iso_curve_and_update_resolves_state():
 
 def test_fluidstate_clean_status_raises_on_property_retrieval():
     with pytest.warns(UserWarning, match="No property provided"):
-        state = ap.FluidState(fluid="water")
+        state = FluidState(fluid="water")
 
     assert state.status == "CLEAN"
     with pytest.raises(ValueError, match="No property provided"):
@@ -70,7 +71,7 @@ def test_fluidstate_clean_status_raises_on_property_retrieval():
 
 def test_fluidstate_iso_curve_only_allows_provided_property():
     with pytest.warns(UserWarning, match="status is ISO-CURVE"):
-        state = ap.FluidState(fluid="water", temp=ap.Var(300, "K"))
+        state = FluidState(fluid="water", temp=ap.Var(300, "K"))
 
     assert state.status == "ISO-CURVE"
     assert state.temp == ap.Var(300, "K")
@@ -81,7 +82,7 @@ def test_fluidstate_iso_curve_only_allows_provided_property():
 
 def test_fluidstate_overdetermined_warns_and_finishes_determined():
     with pytest.warns(UserWarning, match="More than 2 properties provided"):
-        state = ap.FluidState(
+        state = FluidState(
             fluid="water",
             temp=ap.Var(450, "degC"),
             rho=ap.Var(999.84, "kg/m3"),
@@ -93,7 +94,7 @@ def test_fluidstate_overdetermined_warns_and_finishes_determined():
 
 
 def test_fluidstate_lazy_mode_solves_on_first_property_access():
-    state = ap.FluidState(fluid="water", temp=ap.Var(450, "degC"), p=ap.Var(2, "MPa"), lazy=True)
+    state = FluidState(fluid="water", temp=ap.Var(450, "degC"), p=ap.Var(2, "MPa"), lazy=True)
 
     assert state.status == "CLEAN"
     _ = state.h
@@ -101,7 +102,7 @@ def test_fluidstate_lazy_mode_solves_on_first_property_access():
 
 
 def test_fluidstate_update_with_two_properties_recomputes_state():
-    state = ap.FluidState(fluid="water", temp=ap.Var(450, "degC"), p=ap.Var(2, "MPa"))
+    state = FluidState(fluid="water", temp=ap.Var(450, "degC"), p=ap.Var(2, "MPa"))
     state.update(temp=ap.Var(300, "K"), p=ap.Var(101.325, "kPa"))
 
     assert state.status == "DETERMINED"

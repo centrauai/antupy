@@ -4,11 +4,8 @@ import warnings
 import numpy as np
 from antupy.core.units import Unit
 from antupy.core.var import Var
-from antupy.utils import props, htc
 
 import CoolProp.CoolProp as CP
-
-
 
 _DEFAULT_FLUID = "water"
 _DEFAULT_TEMP = Var(273.15, "K")
