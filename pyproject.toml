@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "antupy"
-version = "0.6.3"
+version = "0.6.4"
 description = "Toolkit for energy engineering"
 authors = ["David Saldivia <david.saldivia.s@gmail.com>"]
 readme = "README.md"
